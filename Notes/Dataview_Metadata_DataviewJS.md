@@ -88,4 +88,4 @@ SORT L.date DESC, L.start DESC
 ### Προϋπόθεση λειτουργίας
 Πρέπει να πάτε στα **Settings -> Dataview** του Obsidian και να ενεργοποιήσετε την επιλογή **Enable JavaScript Queries**.
 
-[Κώδικας για Διαδραστικό Πίνακα με Μπάρα Αναζήτησης](Obsidian/scripts/obsidian_master_file.js)
+[Κώδικας για Διαδραστικό Πίνακα με Μπάρα Αναζήτησης](scripts/obsidian_master_file.js)
