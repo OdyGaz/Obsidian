@@ -1,196 +1,218 @@
-// Αποθηκεύει το HTML στοιχείο του τρέχοντος block σημείωσης στη μεταβλητή containerEl
+// Αποθήκευση του κεντρικού στοιχείου HTML (container) όπου θα σχεδιαστεί το UI και ο πίνακας
 const containerEl = this.container;
 
-// Ορίζει τη συνάρτηση draw που δέχεται ως παράμετρο το κείμενο φιλτραρίσματος (filterText)
+// Καθαρισμός του container κατά την αρχική φόρτωση για να μην διπλασιάζεται το περιεχόμενο
+containerEl.empty(); 
+
+// Ανάκτηση του μονοπατιού (path) του τρέχοντος ενεργού αρχείου Markdown στο Obsidian
+const currentFilePath = dv.current().file.path;
+
+// Λήψη του πραγματικού αντικειμένου αρχείου (TFile) από το Vault του Obsidian χρησιμοποιώντας το μονοπάτι του
+const currentFile = app.vault.getAbstractFileByPath(currentFilePath);
+
+// Ανάγνωση της τιμής του φίλτρου 'project-filter' από το Frontmatter (Properties) του αρχείου, ή κενό ("") αν δεν υπάρχει
+const defaultFilter = dv.current()["project-filter"] || "";
+
+// Δημιουργία ενός νέου div στοιχείου HTML που θα περιέχει τη μπάρα αναζήτησης και τα κουμπιά
+const searchDiv = containerEl.createEl("div", { 
+    // Προσθήκη CSS κλάσης 'search-ui-container' για να μπορούμε να το στοχεύσουμε (π.χ. για απόκρυψη στο PDF)
+    cls: "search-ui-container", 
+    // Ορισμός inline CSS ιδιοτήτων για τη σωστή στοίχιση, αποστάσεις και εμφάνιση των στοιχείων του UI
+    attr: { style: "margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;" } 
+});
+
+// Δημιουργία ενός style element μέσα στο searchDiv για να εισάγουμε κανόνες CSS
+searchDiv.createEl("style", {
+    // Ορισμός κανόνα εκτύπωσης (@media print): Όταν εξάγεται σε PDF, το UI αναζήτησης αποκρύπτεται εντελώς
+    text: "@media print { .search-ui-container { display: none !important; } }"
+});
+
+// Δημιουργία ενός span στοιχείου κειμένου που λειτουργεί ως ετικέτα (label) για το φίλτρο
+searchDiv.createSpan({ 
+    // Ορισμός του κειμένου της ετικέτας
+    text: "Φίλτρο Project:", 
+    // Ορισμός στυλ για έντονη γραφή (bold) και συγκεκριμένο μέγεθος γραμματοσειράς
+    attr: { style: "font-weight: bold; font-size: 0.95em;" } 
+});
+
+// Δημιουργία του πεδίου εισαγωγής κειμένου (input box) για την πληκτρολόγηση του φίλτρου
+const input = searchDiv.createEl("input", { 
+    attr: { 
+        // Ορισμός του τύπου του στοιχείου ως text input
+        type: "text", 
+        // Ορισμός κειμένου προτροπής (placeholder) όταν το πεδίο είναι άδειο
+        placeholder: "Πληκτρολογήστε όνομα...", 
+        // Αρχικοποίηση της τιμής του πεδίου με το προκαθορισμένο φίλτρο από το Frontmatter
+        value: defaultFilter, 
+        // Ορισμός στυλ (padding, border, στρογγυλεμένες γωνίες, χρώματα συμβατά με το θέμα του Obsidian και πλάτος)
+        style: "padding: 6px 10px; border-radius: 6px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); color: var(--text-normal); width: 220px; font-size: 0.9em;" 
+    } 
+});
+
+// Δημιουργία του κουμπιού "Αναζήτηση"
+const button = searchDiv.createEl("button", { 
+    // Ορισμός του κειμένου που θα εμφανίζεται πάνω στο κουμπί
+    text: "Αναζήτηση", 
+    attr: { 
+        // Ορισμός στυλ (χρώματα interactive accent του Obsidian, λευκό κείμενο, στρογγυλεμένες γωνίες και δείκτης ποντικιού)
+        style: "padding: 6px 12px; cursor: pointer; border-radius: 6px; background: var(--interactive-accent); color: var(--text-on-accent); border: none; font-weight: bold; font-size: 0.9em;" 
+    } 
+});
+
+// Δημιουργία του κουμπιού "Καθαρισμός"
+const clearBtn = searchDiv.createEl("button", { 
+    // Ορισμός του κειμένου που θα εμφανίζεται πάνω στο κουμπί
+    text: "Καθαρισμός", 
+    attr: { 
+        // Ορισμός στυλ (διακριτικό γκρι χρώμα φόντου και περιγράμματος, κατάλληλο για δευτερεύουσα ενέργεια)
+        style: "padding: 6px 12px; cursor: pointer; border-radius: 6px; background: var(--background-modifier-border); border: 1px solid var(--background-modifier-border-hover); font-size: 0.9em;" 
+    } 
+});
+
+// Ορισμός της βασικής συνάρτησης draw, η οποία φιλτράρει τα δεδομένα και σχεδιάζει τον πίνακα
 function draw(filterText) {
-    // Καθαρίζει όλο το περιεχόμενο του containerEl ώστε να μην διπλασιάζονται τα στοιχεία σε κάθε εκτέλεση
-    containerEl.empty();
-    
-    // Δημιουργεί ένα νέο στοιχείο div μέσα στο containerEl για να φιλοξενήσει τα στοιχεία αναζήτησης
-    const searchDiv = containerEl.createEl("div", { 
-        // Ορίζει τις στυλιστικές ιδιότητες CSS (διάταξη flex, περιθώρια, απόσταση κλπ) για το div
-        attr: { style: "margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;" } 
-    // Κλείνει το αντικείμενο ρυθμίσεων του div
+    // Μετατροπή των παιδιών του container σε Array και επανάληψη σε καθένα από αυτά
+    Array.from(containerEl.children).forEach(child => {
+        // Αν το παιδί ΔΕΝ είναι η μπάρα αναζήτησης (searchDiv), τότε το διαγράφουμε (π.χ. παλιούς πίνακες ή μηνύματα)
+        if (child !== searchDiv) {
+            child.remove();
+        }
     });
+
+    // Ενημέρωση της τιμής του input πεδίου με το τρέχον κείμενο φίλτρου
+    input.value = filterText;
     
-    // Δημιουργεί ένα στοιχείο κειμένου span μέσα στο searchDiv
-    searchDiv.createSpan({ 
-        // Ορίζει το σταθερό κείμενο που θα εμφανίζεται στο span ("Φίλτρο Project:")
-        text: "Φίλτρο Project:", 
-        // Ορίζει στυλ CSS για το span (έντονα γράμματα, μέγεθος γραμματοσειράς)
-        attr: { style: "font-weight: bold; font-size: 0.95em;" } 
-    // Κλείνει το αντικείμενο ρυθμίσεων του span
-    });
-    
-    // Δημιουργεί ένα πεδίο εισαγωγής κειμένου (input) μέσα στο searchDiv
-    const input = searchDiv.createEl("input", { 
-        // Ξεκινά τον ορισμό των ιδιοτήτων (attributes) του input
-        attr: { 
-            // Ορίζει τον τύπο του πεδίου εισαγωγής ως απλό κείμενο
-            type: "text", 
-            // Ορίζει το αχνό κείμενο προτροπής (placeholder) μέσα στο πεδίο
-            placeholder: "Πληκτρολογήστε όνομα...", 
-            // Θέτει την τρέχουσα τιμή του πεδίου ίση με το φίλτρο που εφαρμόστηκε
-            value: filterText,
-            // Εφαρμόζει στυλ CSS που εναρμονίζεται με το τρέχον θέμα (Light/Dark) του Obsidian
-            style: "padding: 6px 10px; border-radius: 6px; border: 1px solid var(--background-modifier-border); background: var(--background-primary); color: var(--text-normal); width: 220px; font-size: 0.9em;" 
-        // Κλείνει το αντικείμενο των ιδιοτήτων (attributes)
-        } 
-    // Κλείνει το αντικείμενο ρυθμίσεων του input
-    });
-    
-    // Δημιουργεί ένα κουμπί (button) μέσα στο searchDiv για την εκτέλεση της αναζήτησης
-    const button = searchDiv.createEl("button", { 
-        // Ορίζει το κείμενο πάνω στο κουμπί ως "Αναζήτηση"
-        text: "Αναζήτηση", 
-        // Ξεκινά τον ορισμό των ιδιοτήτων (attributes) του κουμπιού
-        attr: { 
-            // Εφαρμόζει στυλ CSS (χρώμα έμφασης του Obsidian, στρογγυλεμένες γωνίες, δείκτη ποντικιού κλπ)
-            style: "padding: 6px 12px; cursor: pointer; border-radius: 6px; background: var(--interactive-accent); color: var(--text-on-accent); border: none; font-weight: bold; font-size: 0.9em;" 
-        // Κλείνει το αντικείμενο των ιδιοτήτων (attributes)
-        } 
-    // Κλείνει το αντικείμενο ρυθμίσεων του κουμπιού
-    });
-    
-    // Δημιουργεί ένα δεύτερο κουμπί μέσα στο searchDiv για τον καθαρισμό του φίλτρου
-    const clearBtn = searchDiv.createEl("button", { 
-        // Ορίζει το κείμενο πάνω στο κουμπί ως "Καθαρισμός"
-        text: "Καθαρισμός", 
-        // Ξεκινά τον ορισμό των ιδιοτήτων (attributes) του clearBtn
-        attr: { 
-            // Εφαρμόζει στυλ CSS με ουδέτερα χρώματα περιγράμματος και φόντου
-            style: "padding: 6px 12px; cursor: pointer; border-radius: 6px; background: var(--background-modifier-border); border: 1px solid var(--background-modifier-border-hover); font-size: 0.9em;" 
-        // Κλείνει το αντικείμενο των ιδιοτήτων (attributes)
-        } 
-    // Κλείνει το αντικείμενο ρυθμίσεων του clearBtn
-    });
-    
-    // Αναζητά όλες τις σημειώσεις (σελίδες) που βρίσκονται μέσα στον φάκελο "00_Daily"
+    // Ανάκτηση όλων των σελίδων που βρίσκονται μέσα στον φάκελο "00_Daily"
     const pages = dv.pages('"00_Daily"');
-    // Αρχικοποιεί έναν άδειο πίνακα (array) για να αποθηκεύσει τις γραμμές που θα εμφανιστούν στον τελικό πίνακα
+    // Δημιουργία ενός άδειου πίνακα για την αποθήκευση των φιλτραρισμένων γραμμών
     let rows = [];
     
-    // Ξεκινά έναν βρόχο (loop) για να εξετάσει μία-μία όλες τις σελίδες που βρέθηκαν στον φάκελο
+    // Επανάληψη (loop) μέσα από κάθε σελίδα που βρέθηκε στον φάκελο
     for (let page of pages) {
-        // Ελέγχει αν η συγκεκριμένη σελίδα περιέχει λίστες ή κουκκίδες (bullet points)
+        // Έλεγχος αν η σελίδα περιέχει λίστες (bullet points / lists)
         if (page.file.lists) {
-            // Ξεκινά έναν εσωτερικό βρόχο για να εξετάσει κάθε μεμονωμένο στοιχείο λίστας L της σελίδας
+            // Επανάληψη μέσα από κάθε στοιχείο λίστας (L) της συγκεκριμένης σελίδας
             for (let L of page.file.lists) {
-                // Ελέγχει αν το στοιχείο λίστας L έχει ορισμένο (όχι κενό) το πεδίο project
+                // Έλεγχος αν το στοιχείο λίστας έχει ορισμένο το inline πεδίο 'project'
                 if (L.project !== undefined && L.project !== null) {
-                    // Μετατρέπει την τιμή του project σε συμβολοσειρά (string) για ασφαλή επεξεργασία
+                    // Μετατροπή της τιμής του project σε αλφαριθμητικό (string) για ασφαλή σύγκριση
                     const projName = String(L.project);
                     
-                    // Ελέγχει αν το φίλτρο είναι κενό Ή αν το όνομα του project περιέχει το κείμενο αναζήτησης (μετατρέποντας και τα δύο σε πεζά)
+                    // Αν δεν υπάρχει φίλτρο, ή αν το όνομα του project περιέχει το κείμενο αναζήτησης (case-insensitive)
                     if (filterText === "" || projName.toLowerCase().includes(filterText.toLowerCase())) {
-                        // Προσθέτει ένα νέο αντικείμενο στον πίνακα rows με όλα τα δεδομένα της γραμμής
+                        // Προσθήκη ενός αντικειμένου με τα δεδομένα της γραμμής στον πίνακα rows
                         rows.push({
-                            // Αποθηκεύει το όνομα του project
-                            project: L.project,
-                            // Αποθηκεύει τα MyTags, ή κενό αν δεν υπάρχουν
-                            tags: L.MyTags || "",
-                            // Αποθηκεύει την ημερομηνία, ή κενό αν δεν υπάρχει
-                            date: L.date || "",
-                            // Αποθηκεύει την ώρα έναρξης, ή κενό αν δεν υπάρχει
-                            start: L.start || "",
-                            // Αποθηκεύει την ώρα λήξης, ή κενό αν δεν υπάρχει
-                            end: L.end || "",
-                            // Αποθηκεύει την περιγραφή, ή κενό αν δεν υπάρχει
-                            desc: L.desc || "",
-                            // Αποθηκεύει την απόφαση, ή κενό αν δεν υπάρχει
-                            decision: L.decision || "",
-                            // Αποθηκεύει τους συμμετέχοντες, ή κενό αν δεν υπάρχουν
-                            attendees: L.attendees || "",
-                            // Αποθηκεύει το mood, ή κενό αν δεν υπάρχει
-                            mood: L.mood || "",
-                            // Αποθηκεύει τα αρχεία, ή κενό αν δεν υπάρχουν
-                            files: L.files || "",
-                            // Δημιουργεί μια έκδοση της ημερομηνίας σε string για χρήση στην ταξινόμηση
-                            sortDate: L.date ? String(L.date) : "",
-                            // Δημιουργεί μια έκδοση της ώρας έναρξης σε string για χρήση στην ταξινόμηση
-                            sortStart: L.start ? String(L.start) : ""
-                        // Κλείνει την προσθήκη (push) του αντικειμένου
+                            file: page.file.link, // Σύνδεσμος (link) προς το αρχείο της Daily Note
+                            fileName: page.file.name, // Το όνομα του αρχείου (συνήθως ημερομηνία YYYY-MM-DD)
+                            project: L.project, // Το όνομα του project
+                            date: L.date || "", // Ημερομηνία της καταγραφής (αν υπάρχει)
+                            start: L.start || "", // Ώρα έναρξης (αν υπάρχει)
+                            end: L.end || "", // Ώρα λήξης (αν υπάρχει)
+                            desc: L.desc || "", // Περιγραφή της εργασίας
+                            decision: L.decision || "", // Απόφαση που πάρθηκε (αν υπάρχει)
+                            attendees: L.attendees || "", // Συμμετέχοντες (αν υπάρχουν)
+                            files: L.files || "", // Σχετικά αρχεία/σύνδεσμοι (αν υπάρχουν)
+                            tags: L.MyTags || L.tags || "", // Tags, με προτίμηση στο MyTags και εναλλακτική στα κλασικά tags
+                            mood: L.mood || "", // Η διάθεση (mood) της καταγραφής
+                            line: L.line || 0 // Ο αριθμός γραμμής μέσα στο αρχείο (χρήσιμο για σωστή ταξινόμηση)
                         });
-                    // Κλείνει τον έλεγχο (if) του φίλτρου αναζήτησης
                     }
-                // Κλείνει τον έλεγχο (if) ύπαρξης του project
                 }
-            // Κλείνει τον βρόχο επανάληψης (for) των στοιχείων λίστας
             }
-        // Κλείνει τον έλεγχο (if) ύπαρξης λιστών στη σελίδα
         }
-    // Κλείνει τον βρόχο επανάληψης (for) των σελίδων
     }
     
-    // Ταξινομεί τα στοιχεία του πίνακα rows χρησιμοποιώντας μια συνάρτηση σύγκρισης (sort)
+    // Ταξινόμηση των γραμμών του πίνακα rows
     rows.sort((a, b) => {
-        // Ελέγχει αν οι ημερομηνίες των δύο στοιχείων (a και b) είναι διαφορετικές
-        if (b.sortDate !== a.sortDate) {
-            // Ταξινομεί φθίνουσα με βάση την ημερομηνία (πιο πρόσφατη πρώτη)
-            return b.sortDate.localeCompare(a.sortDate);
-        // Κλείνει τον έλεγχο της ημερομηνίας
+        // Αν οι γραμμές προέρχονται από διαφορετικά αρχεία (διαφορετικές ημέρες)
+        if (b.fileName !== a.fileName) {
+            // Ταξινομούμε φθίνουσα με βάση το όνομα του αρχείου (οι πιο πρόσφατες μέρες εμφανίζονται πρώτες)
+            return b.fileName.localeCompare(a.fileName);
         }
-        // Αν οι ημερομηνίες είναι ίδιες, ταξινομεί φθίνουσα με βάση την ώρα έναρξης
-        return b.sortStart.localeCompare(a.sortStart);
-    // Κλείνει τη συνάρτηση ταξινόμησης rows.sort
+        // Αν προέρχονται από το ίδιο αρχείο, ταξινομούμε αύξουσα με βάση τον αριθμό γραμμής (σειρά καταγραφής)
+        return a.line - b.line; 
     });
     
-    // Ορίζει έναν πίνακα με τους τίτλους των στηλών του Dataview πίνακα
-    const headers = ["Project", "Tags", "Ημερομηνία", "Έναρξη", "Λήξη", "Περιγραφή", "Απόφαση", "Συμμετέχοντες", "Mood", "Αρχεία"];
-    // Μετατρέπει τον πίνακα αντικειμένων rows σε πίνακα από arrays τιμών που απαιτεί η dv.table
+    // Έλεγχος αν ο πίνακας rows είναι άδειος (δηλαδή δεν βρέθηκε καμία καταγραφή που να ταιριάζει)
+    if (rows.length === 0) {
+        // Δημιουργία ενός στοιχείου παραγράφου (p) για την εμφάνιση μηνύματος μη εύρεσης αποτελεσμάτων
+        containerEl.createEl("p", { 
+            // Ορισμός του κειμένου ειδοποίησης
+            text: "Δεν βρέθηκαν καταγραφές που να ταιριάζουν με το φίλτρο.",
+            // Ορισμός πλάγιου στυλ (italic) και γκρι χρώματος κειμένου (muted)
+            attr: { style: "font-style: italic; color: var(--text-muted); margin-top: 15px;" }
+        });
+        // Τερματισμός της συνάρτησης draw εδώ, ώστε να μην σχεδιαστεί άδειος πίνακας
+        return;
+    }
+    
+    // Ορισμός των τίτλων των στηλών (headers) για τον πίνακα του Dataview
+    const headers = ["Αρχείο", "Project", "Περιγραφή", "Απόφαση", "Αρχεία", "Έναρξη", "Λήξη", "Συμμετέχοντες", "Mood", "Tags"];
+    // Χαρτογράφηση (mapping) των αντικειμένων του πίνακα rows σε απλούς πίνακες τιμών που απαιτεί το Dataview
     const tableData = rows.map(r => [
-        // Τοποθετεί την τιμή του project στην πρώτη στήλη
-        r.project,
-        // Τοποθετεί τα tags στη δεύτερη στήλη
-        r.tags,
-        // Τοποθετεί την ημερομηνία στην τρίτη στήλη
-        r.date,
-        // Τοποθετεί την ώρα έναρξης στην τέταρτη στήλη
-        r.start,
-        // Τοποθετεί την ώρα λήξης στην πέμπτη στήλη
-        r.end,
-        // Τοποθετεί την περιγραφή στην έκτη στήλη
-        r.desc,
-        // Τοποθετεί την απόφαση στην έβδομη στήλη
-        r.decision,
-        // Τοποθετεί τους συμμετέχοντες στην όγδοη στήλη
-        r.attendees,
-        // Τοποθετεί το mood στην ένατη στήλη
-        r.mood,
-        // Τοποθετεί τα αρχεία στη δέκατη στήλη
-        r.files
-    // Κλείνει τη μετατροπή (map) των δεδομένων
+        r.file, // Σύνδεσμος αρχείου
+        r.project, // Όνομα project
+        r.desc, // Περιγραφή
+        r.decision, // Απόφαση
+        r.files, // Αρχεία
+        r.start, // Έναρξη
+        r.end, // Λήξη
+        r.attendees, // Συμμετέχοντες
+        r.mood, // Mood
+        r.tags, // Tags
     ]);
     
-    // Προσθέτει έναν μηχανισμό παρακολούθησης κλικ (click event) στο κουμπί αναζήτησης
-    button.addEventListener("click", () => {
-        // Καλεί τη συνάρτηση draw με την τρέχουσα τιμή του input, αφαιρώντας περιττά κενά (trim)
-        draw(input.value.trim());
-    // Κλείνει τον click event listener του κουμπιού
-    });
-    
-    // Προσθέτει έναν μηχανισμό παρακολούθησης πληκτρολογίου (keydown event) στο πεδίο input
-    input.addEventListener("keydown", (e) => {
-        // Ελέγχει αν το πλήκτρο που πατήθηκε είναι το "Enter"
-        if (e.key === "Enter") {
-            // Καλεί τη συνάρτηση draw με την τρέχουσα τιμή του input, αφαιρώντας περιττά κενά
-            draw(input.value.trim());
-        // Κλείνει τον έλεγχο για το πλήκτρο Enter
-        }
-    // Κλείνει τον keydown event listener του input
-    });
-    
-    // Προσθέτει έναν μηχανισμό παρακολούθησης κλικ (click event) στο κουμπί καθαρισμού
-    clearBtn.addEventListener("click", () => {
-        // Καλεί τη συνάρτηση draw με κενό φίλτρο ("") για να εμφανιστούν ξανά όλα τα projects
-        draw("");
-    // Κλείνει τον click event listener του κουμπιού καθαρισμού
-    });
-    
-    // Καλεί τη μέθοδο του Dataview για να σχεδιάσει και να εμφανίσει τον τελικό πίνακα στην οθόνη
+    // Κλήση της ενσωματωμένης συνάρτησης του Dataview για τη σχεδίαση του τελικού πίνακα
     dv.table(headers, tableData);
-// Κλείνει τη συνάρτηση draw
 }
 
-// Εκτελεί για πρώτη φορά τη συνάρτηση draw με κενό φίλτρο, ώστε να εμφανιστούν τα δεδομένα μόλις ανοίξει η σημείωση
-draw("");
+// Ορισμός ασύγχρονης συνάρτησης για την ενημέρωση των ιδιοτήτων (Properties/YAML) της σημείωσης
+async function updateFilterFrontmatter(value) {
+    // Αν για οποιονδήποτε λόγο δεν βρέθηκε το αντικείμενο του αρχείου, σταματάμε τη διαδικασία
+    if (!currentFile) return;
+    // Χρήση του FileManager API του Obsidian για την ασφαλή επεξεργασία του Frontmatter
+    await app.fileManager.processFrontMatter(currentFile, (fm) => {
+        // Αν η τιμή του φίλτρου δεν είναι κενή
+        if (value) {
+            // Ορίζουμε ή ενημερώνουμε το πεδίο 'project-filter' με το νέο κείμενο
+            fm["project-filter"] = value;
+        } else {
+            // Αν η τιμή είναι κενή, διαγράφουμε τελείως την ιδιότητα για να διατηρείται καθαρό το αρχείο
+            delete fm["project-filter"];
+        }
+    });
+}
+
+// Προσθήκη Event Listener στο κουμπί "Αναζήτηση" για την ανίχνευση κλικ (click)
+button.addEventListener("click", async () => {
+    // Λήψη της τιμής από το input πεδίο, αφαιρώντας τα περιττά κενά στην αρχή και στο τέλος
+    const val = input.value.trim();
+    // Ασύγχρονη αποθήκευση της νέας τιμής στο Frontmatter της σημείωσης
+    await updateFilterFrontmatter(val);
+    // Κλήση της draw με το νέο φίλτρο για την επανασχεδίαση του πίνακα
+    draw(val);
+});
+
+// Προσθήκη Event Listener στο input πεδίο για την ανίχνευση πατήματος πλήκτρου (keydown)
+input.addEventListener("keydown", async (e) => {
+    // Έλεγχος αν το πλήκτρο που πατήθηκε είναι το "Enter"
+    if (e.key === "Enter") {
+        // Λήψη της τιμής από το input πεδίο, αφαιρώντας τα περιττά κενά
+        const val = input.value.trim();
+        // Ασύγχρονη αποθήκευση της νέας τιμής στο Frontmatter της σημείωσης
+        await updateFilterFrontmatter(val);
+        // Κλήση της draw με το νέο φίλτρο για την επανασχεδίαση του πίνακα
+        draw(val);
+    }
+});
+
+// Προσθήκη Event Listener στο κουμπί "Καθαρισμός" για την ανίχνευση κλικ
+clearBtn.addEventListener("click", async () => {
+    // Ασύγχρονη διαγραφή του φίλτρου από το Frontmatter (αποθήκευση κενού)
+    await updateFilterFrontmatter("");
+    // Κλήση της draw με κενό φίλτρο ώστε να εμφανιστούν ξανά όλα τα projects
+    draw("");
+});
+
+// Αρχική εκτέλεση της συνάρτησης draw κατά τη φόρτωση της σελίδας, χρησιμοποιώντας το φίλτρο από το Frontmatter (αν υπάρχει)
+draw(defaultFilter);
